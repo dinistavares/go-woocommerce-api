@@ -156,6 +156,7 @@ func (client *Client) NewRequest(method, urlStr string, opts interface{}, body i
 	}
 
 	req.Header.Add(client.auth.HeaderName, client.auth.ApiKey)
+	req.Header.Add("Cache-Control", "private") // Resolves "Sorry, you cannot list resources." error
 	req.Header.Add("Accept", acceptedContentType)
 	req.Header.Add("Content-type", acceptedContentType)
 	req.Header.Add("User-Agent", userAgent)
