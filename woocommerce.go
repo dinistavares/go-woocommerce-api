@@ -2,6 +2,7 @@ package woocommerce
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -82,13 +83,25 @@ func New(shopURL string) (*Client, error) {
 		return nil, errors.New("store url is required")
 	}
 
-	config := ClientConfig{
-		HttpClient: http.DefaultClient,
+	httpClient := http.DefaultClient
+
+	if shopURL == "https://wordpress.local.sparklayer.io" {
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
 	}
 
-	config.HttpClient = http.DefaultClient
-	config.RestEndpointURL = shopURL
-	config.RestEndpointVersion = defaultRestEndpointVersion
+	config := ClientConfig{
+		HttpClient:          http.DefaultClient,
+		RestEndpointVersion: defaultRestEndpointVersion,
+		RestEndpointURL:     shopURL,
+	}
+
+	//config.HttpClient = http.DefaultClient
+	//config.RestEndpointURL = shopURL
+	//config.RestEndpointVersion = defaultRestEndpointVersion
 
 	// Create client
 	baseURL, err := url.Parse(config.RestEndpointURL + "/wp-json/wc/" + defaultRestEndpointVersion)
