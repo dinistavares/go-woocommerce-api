@@ -7,7 +7,6 @@ import (
   "errors"
   "fmt"
   "io"
-  "io/ioutil"
   "net/http"
   "net/url"
   "strings"
@@ -23,6 +22,7 @@ const (
   userAgent                    = "go-woocommerce-api/1.1"
   clientRequestRetryAttempts   = 2
   clientRequestRetryHoldMillis = 1000
+  clientTimeout                = 10
 )
 
 var errorDoAllAttemptsExhausted = errors.New("all request attempts were exhausted")
@@ -81,13 +81,27 @@ func New(shopURL string) (*Client, error) {
     return nil, errors.New("store url is required")
   }
 
-  config := ClientConfig{
-    HttpClient: http.DefaultClient,
-  }
+  return NewWithConfig(ClientConfig{
+    RestEndpointURL: shopURL,
+  })
+}
 
-  config.HttpClient = http.DefaultClient
-  config.RestEndpointURL = shopURL
-  config.RestEndpointVersion = defaultRestEndpointVersion
+func NewWithConfig(config ClientConfig) (*Client, error) {
+  if config.RestEndpointURL == "" {
+    return nil, errors.New("rest endpoint url is required")
+  }
+  
+  // Defaults
+  if config.HttpClient == nil {
+    // Create client
+    config.HttpClient = &http.Client{
+      Timeout: time.Duration(clientTimeout * time.Second),
+    }
+  }
+  
+  if config.RestEndpointVersion == "" {
+    config.RestEndpointVersion = defaultRestEndpointVersion
+  }
 
   // Create client
   baseURL, err := url.Parse(config.RestEndpointURL + "/wp-json/wc/" + defaultRestEndpointVersion)
@@ -218,7 +232,7 @@ func (client *Client) doAttempt(req *http.Request, v interface{}) (*http.Respons
 
   if v != nil {
     if w, ok := v.(io.Writer); ok {
-      io.Copy(w, resp.Body)
+      _, _ = io.Copy(w, resp.Body)
     } else {
       err = json.NewDecoder(resp.Body).Decode(v)
       if err == io.EOF {
@@ -251,9 +265,9 @@ func checkResponse(response *http.Response) error {
   // Map response error data (eg. HTTP 4xx)
   errorResponse := &errorResponse{Response: response}
 
-  data, err := ioutil.ReadAll(response.Body)
+  data, err := io.ReadAll(response.Body)
   if err == nil && data != nil {
-    json.Unmarshal(data, errorResponse)
+    _ = json.Unmarshal(data, errorResponse)
   }
 
   return errorResponse
